@@ -3,7 +3,7 @@ import gradio as gr
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
-BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-3B-Instruct")
 ADAPTER = os.getenv("ADAPTER_MODEL", "akothari09/f1StrategyTrainer")
 
 tokenizer = None
@@ -56,16 +56,16 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
         
         # Create prompt from inputs
         prompt = f"""Generate an optimal Formula 1 race strategy for the following conditions:
+        `
+        Driver: {driver}
+        Race/Circuit: {race}
+        Track Temperature: {track_temp}°C
+        Air Temperature: {air_temp}°C
+        Wind Speed: {wind_speed} km/h
+        Track Condition: {track_condition}
 
-Driver: {driver}
-Race/Circuit: {race}
-Track Temperature: {track_temp}°C
-Air Temperature: {air_temp}°C
-Wind Speed: {wind_speed} km/h
-Track Condition: {track_condition}
-
-Provide a detailed race strategy including tire choices, pit stop windows, and key considerations."""
-
+        Provide a detailed race strategy including tire choices, pit stop windows, and key considerations."""
+        
         # Format with chat template
         messages = [{"role": "user", "content": prompt}]
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
