@@ -15,35 +15,47 @@ def load_model():
     if model is not None:
         return
 
-    print("Loading model... This may take a minute.")
-    
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
+    try:
+        print("Loading model... This may take a minute.")
+        print(f"Base model: {BASE_MODEL}")
+        print(f"Adapter: {ADAPTER}")
+        
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+        )
 
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
-    base = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL,
-        quantization_config=bnb_config,
-        device_map="auto",
-        trust_remote_code=True,
-    )
-    model = PeftModel.from_pretrained(base, ADAPTER)
-    model.eval()
-    
-    print("Model loaded successfully!")
+        print("Loading tokenizer...")
+        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
+        
+        print("Loading base model...")
+        base = AutoModelForCausalLM.from_pretrained(
+            BASE_MODEL,
+            quantization_config=bnb_config,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        
+        print("Loading adapter...")
+        model = PeftModel.from_pretrained(base, ADAPTER)
+        model.eval()
+        
+        print("Model loaded successfully!")
+    except Exception as e:
+        print(f"ERROR loading model: {str(e)}")
+        raise e
 
 def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_condition, max_tokens, temperature):
     """Generate F1 race strategy based on inputs"""
     
-    # Load model if not already loaded
-    load_model()
-    
-    # Create prompt from inputs
-    prompt = f"""Generate an optimal Formula 1 race strategy for the following conditions:
+    try:
+        # Load model if not already loaded
+        load_model()
+        
+        # Create prompt from inputs
+        prompt = f"""Generate an optimal Formula 1 race strategy for the following conditions:
 
 Driver: {driver}
 Race/Circuit: {race}
@@ -54,36 +66,43 @@ Track Condition: {track_condition}
 
 Provide a detailed race strategy including tire choices, pit stop windows, and key considerations."""
 
-    # Format with chat template
-    messages = [{"role": "user", "content": prompt}]
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        # Format with chat template
+        messages = [{"role": "user", "content": prompt}]
+        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
-    # Tokenize
-    inputs = tokenizer(text, return_tensors="pt")
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        # Tokenize
+        inputs = tokenizer(text, return_tensors="pt")
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
-    # Generate
-    with torch.no_grad():
-        out = model.generate(
-            **inputs,
-            max_new_tokens=int(max_tokens),
-            do_sample=temperature > 0,
-            temperature=float(temperature) if temperature > 0 else 1.0,
-            top_p=0.95,
-            repetition_penalty=1.1,
-        )
+        # Generate
+        with torch.no_grad():
+            out = model.generate(
+                **inputs,
+                max_new_tokens=int(max_tokens),
+                do_sample=temperature > 0,
+                temperature=float(temperature) if temperature > 0 else 1.0,
+                top_p=0.95,
+                repetition_penalty=1.1,
+            )
 
-    # Decode output
-    decoded = tokenizer.decode(out[0], skip_special_tokens=True)
-    
-    # Try to extract just the assistant's response (remove the prompt)
-    if "<|im_start|>assistant" in decoded:
-        strategy = decoded.split("<|im_start|>assistant")[-1].strip()
-        strategy = strategy.replace("<|im_end|>", "").strip()
-    else:
-        strategy = decoded
-    
-    return strategy
+        # Decode output
+        decoded = tokenizer.decode(out[0], skip_special_tokens=True)
+        
+        # Try to extract just the assistant's response (remove the prompt)
+        if "<|im_start|>assistant" in decoded:
+            strategy = decoded.split("<|im_start|>assistant")[-1].strip()
+            strategy = strategy.replace("<|im_end|>", "").strip()
+        else:
+            strategy = decoded
+        
+        return strategy
+        
+    except Exception as e:
+        error_msg = f"Error generating strategy: {str(e)}\n\nPlease check the Space logs for details."
+        print(f"ERROR in generate_strategy: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_msg
 
 # Create Gradio interface
 with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
@@ -203,5 +222,5 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     )
 
 # Launch the app
-if (__name__ == "__main__"):
+if __name__ == "__main__":
     demo.launch()
