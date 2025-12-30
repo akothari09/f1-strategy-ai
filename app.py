@@ -50,18 +50,18 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
         # Create prompt from inputs
         prompt = f"""You are an expert Formula 1 race strategist. Generate an optimal race strategy for the following conditions:
 
-Driver: {driver}
-Race/Circuit: {race}
-Track Temperature: {track_temp}°C
-Air Temperature: {air_temp}°C
-Wind Speed: {wind_speed} km/h
-Track Condition: {track_condition}
+        Driver: {driver}
+        Race/Circuit: {race}
+        Track Temperature: {track_temp}°C
+        Air Temperature: {air_temp}°C
+        Wind Speed: {wind_speed} km/h
+        Track Condition: {track_condition}
 
-Provide a detailed race strategy including:
-- Tire compound choices and expected stint lengths
-- Pit stop windows and optimal timing
-- Key considerations for track conditions
-- Alternate strategies if needed"""
+        Provide a detailed race strategy including:
+        - Tire compound choices and expected stint lengths
+        - Pit stop windows and optimal timing
+        - Key considerations for track conditions
+        - Alternate strategies if needed"""
 
         # Format with chat template
         messages = [{"role": "user", "content": prompt}]
@@ -70,10 +70,21 @@ Provide a detailed race strategy including:
         # Tokenize
         inputs = tokenizer(text, return_tensors="pt")
 
-        # Generate
+        # Build chat-formatted input
+        messages = [{"role": "user", "content": prompt}]
+        formatted = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=True,
+            return_tensors="pt"
+        )
+
+        input_ids = formatted["input_ids"]
+
+        # Generate response
         with torch.no_grad():
-            out = model.generate(
-                **inputs,
+            outputs = model.generate(
+                **formatted,
                 max_new_tokens=int(max_tokens),
                 do_sample=temperature > 0,
                 temperature=float(temperature) if temperature > 0 else 1.0,
@@ -82,16 +93,22 @@ Provide a detailed race strategy including:
                 pad_token_id=tokenizer.eos_token_id,
             )
 
-        # Decode output
-        decoded = tokenizer.decode(out[0], skip_special_tokens=True)
+        # slice off prompt
+        generated_ids = outputs[0][input_ids.shape[-1]:]
+
+        # decode the rest of the output
+        strategy = tokenizer.decode(
+            generated_ids,
+            skip_special_tokens=True
+        ).strip()
+
         
-        # Multiple strategies to extract just the assistant's response
-        strategy = decoded
+        decoded = strategy  # Keep original decoded for fallback
         
         # Strategy 1: Look for assistant markers
-        if "<|im_start|>assistant" in strategy:
-            strategy = strategy.split("<|im_start|>assistant")[-1]
-            strategy = strategy.replace("<|im_end|>", "")
+        if "assistant" in strategy:
+            strategy = strategy.split("assistant")[-1]
+            strategy = strategy.replace(":", "", 1).strip()
         
         # Strategy 2: Remove the exact prompt
         if prompt in strategy:
@@ -157,7 +174,7 @@ Provide a detailed race strategy including:
 with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     
     gr.Markdown("""
-    # 🏎️ F1 Strategy AI
+    # F1 Strategy AI
     ### AI-Powered Race Strategy Generator
     
     Enter race conditions below to generate an optimal Formula 1 race strategy using a fine-tuned Qwen2.5-1.5B-Instruct model.
@@ -271,5 +288,5 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     )
 
 # Launch the app
-if __name__ == "__main__":
+if (__name__ == "__main__"):
     demo.launch()
