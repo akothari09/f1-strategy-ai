@@ -3,6 +3,5 @@ transformers
 torch
 accelerate
 peft
-bitsandbytes
 sentencepiece
 protobuf

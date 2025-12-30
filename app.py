@@ -1,6 +1,6 @@
 import os, torch
 import gradio as gr
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 
 BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
@@ -10,7 +10,7 @@ tokenizer = None
 model = None
 
 def load_model():
-    # Load the model once on startup
+    """Load the model once on startup"""
     global tokenizer, model
     if model is not None:
         return
@@ -20,25 +20,18 @@ def load_model():
         print(f"Base model: {BASE_MODEL}")
         print(f"Adapter: {ADAPTER}")
         
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
-        )
-
         print("Loading tokenizer...")
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
         
         print("Loading base model...")
         base = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL,
-            quantization_config=bnb_config,
-            device_map="auto",
+            torch_dtype=torch.float32,  # Use float32 for CPU
+            device_map="cpu",
             trust_remote_code=True,
         )
         
-        print("Loading adapter...")
+        print("Loading fine-tuned adapter...")
         model = PeftModel.from_pretrained(base, ADAPTER)
         model.eval()
         
@@ -48,30 +41,34 @@ def load_model():
         raise e
 
 def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_condition, max_tokens, temperature):
-    # *** Generate F1 race strategy based on inputs ***
+    """Generate F1 race strategy based on inputs"""
     
     try:
         # Load model if not already loaded
         load_model()
         
         # Create prompt from inputs
-        prompt = f"""Generate an optimal Formula 1 race strategy for the following conditions:
-        Driver: {driver}
-        Race/Circuit: {race}
-        Track Temperature: {track_temp}°C
-        Air Temperature: {air_temp}°C
-        Wind Speed: {wind_speed} km/h
-        Track Condition: {track_condition}
+        prompt = f"""You are an expert Formula 1 race strategist. Generate an optimal race strategy for the following conditions:
 
-        Provide a detailed race strategy including tire choices, pit stop windows, and key considerations."""
-        
+Driver: {driver}
+Race/Circuit: {race}
+Track Temperature: {track_temp}°C
+Air Temperature: {air_temp}°C
+Wind Speed: {wind_speed} km/h
+Track Condition: {track_condition}
+
+Provide a detailed race strategy including:
+- Tire compound choices and expected stint lengths
+- Pit stop windows and optimal timing
+- Key considerations for track conditions
+- Alternate strategies if needed"""
+
         # Format with chat template
         messages = [{"role": "user", "content": prompt}]
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
         # Tokenize
         inputs = tokenizer(text, return_tensors="pt")
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
         # Generate
         with torch.no_grad():
@@ -82,16 +79,49 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
                 temperature=float(temperature) if temperature > 0 else 1.0,
                 top_p=0.95,
                 repetition_penalty=1.1,
+                pad_token_id=tokenizer.eos_token_id,
             )
 
         # Decode output
         decoded = tokenizer.decode(out[0], skip_special_tokens=True)
         
-        # Try to extract just the assistant's response (remove the prompt)
-        if "<|im_start|>assistant" in decoded:
-            strategy = decoded.split("<|im_start|>assistant")[-1].strip()
-            strategy = strategy.replace("<|im_end|>", "").strip()
-        else:
+        # Multiple strategies to extract just the assistant's response
+        strategy = decoded
+        
+        # Strategy 1: Look for assistant markers
+        if "<|im_start|>assistant" in strategy:
+            strategy = strategy.split("<|im_start|>assistant")[-1]
+            strategy = strategy.replace("<|im_end|>", "")
+        
+        # Strategy 2: Remove the exact prompt
+        if prompt in strategy:
+            strategy = strategy.replace(prompt, "")
+        
+        # Strategy 3: Look for common response patterns
+        # The model often starts with "Here's" or directly with the strategy
+        for marker in ["You are an expert", "Generate an optimal", prompt[:50]]:
+            if marker in strategy:
+                parts = strategy.split(marker)
+                if len(parts) > 1:
+                    strategy = parts[-1]
+        
+        # Strategy 4: If response starts with the question, split on newlines
+        if strategy.strip().startswith(("Driver:", "You are")):
+            lines = strategy.split('\n')
+            # Find where the actual response starts (after parameters)
+            for i, line in enumerate(lines):
+                if line.strip() and not any(keyword in line for keyword in 
+                    ["Driver:", "Race:", "Track Temperature:", "Air Temperature:", 
+                     "Wind Speed:", "Track Condition:", "Provide a detailed", 
+                     "You are an expert", "Generate an optimal"]):
+                    strategy = '\n'.join(lines[i:])
+                    break
+        
+        # Clean up
+        strategy = strategy.strip()
+        
+        # If we accidentally removed everything, return original
+        if not strategy or len(strategy) < 50:
             strategy = decoded
         
         return strategy
@@ -107,10 +137,10 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
 with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     
     gr.Markdown("""
-    # F1 Strategy AI
+    # 🏎️ F1 Strategy AI
     ### AI-Powered Race Strategy Generator
     
-    Enter race conditions below to generate an optimal Formula 1 race strategy using a fine-tuned Qwen2.5 model.
+    Enter race conditions below to generate an optimal Formula 1 race strategy using Qwen2.5-1.5B-Instruct.
     """)
     
     with gr.Row():
@@ -164,7 +194,7 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
                 max_tokens = gr.Slider(
                     label="Max New Tokens",
                     minimum=100,
-                    maximum=800,
+                    maximum=600,
                     value=400,
                     step=50
                 )
@@ -177,7 +207,7 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
                     step=0.1
                 )
             
-            generate_btn = gr.Button("Generate Strategy", variant="primary", size="lg")
+            generate_btn = gr.Button("🏁 Generate Strategy", variant="primary", size="lg")
             clear_btn = gr.Button("Clear", variant="secondary")
         
         with gr.Column():
@@ -192,9 +222,9 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     
     gr.Markdown("""
     ---
-    **Note:** First generation may take 20-30 seconds as the model loads. Subsequent generations will be faster.
+    **Note:** First generation may take 10-20 seconds as the model loads. Subsequent generations will be faster.
     
-    **Model:** Qwen2.5-3B-Instruct fine-tuned on F1 race strategy data
+    **Model:** Qwen2.5-1.5B-Instruct fine-tuned on F1 race strategy data
     """)
     
     # Button actions
@@ -221,5 +251,5 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     )
 
 # Launch the app
-if (__name__ == "__main__"):
+if __name__ == "__main__":
     demo.launch()
