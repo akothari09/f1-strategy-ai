@@ -3,14 +3,14 @@ import gradio as gr
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
-BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-3B-Instruct")
+BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
 ADAPTER = os.getenv("ADAPTER_MODEL", "akothari09/f1StrategyTrainer")
 
 tokenizer = None
 model = None
 
 def load_model():
-    """Load the model once on startup"""
+    # Load the model once on startup
     global tokenizer, model
     if model is not None:
         return
@@ -48,7 +48,7 @@ def load_model():
         raise e
 
 def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_condition, max_tokens, temperature):
-    """Generate F1 race strategy based on inputs"""
+    # *** Generate F1 race strategy based on inputs ***
     
     try:
         # Load model if not already loaded
@@ -56,7 +56,6 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
         
         # Create prompt from inputs
         prompt = f"""Generate an optimal Formula 1 race strategy for the following conditions:
-        `
         Driver: {driver}
         Race/Circuit: {race}
         Track Temperature: {track_temp}°C
@@ -108,7 +107,7 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
 with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     
     gr.Markdown("""
-    # 🏎️ F1 Strategy AI
+    # F1 Strategy AI
     ### AI-Powered Race Strategy Generator
     
     Enter race conditions below to generate an optimal Formula 1 race strategy using a fine-tuned Qwen2.5 model.
@@ -178,7 +177,7 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
                     step=0.1
                 )
             
-            generate_btn = gr.Button("🏁 Generate Strategy", variant="primary", size="lg")
+            generate_btn = gr.Button("Generate Strategy", variant="primary", size="lg")
             clear_btn = gr.Button("Clear", variant="secondary")
         
         with gr.Column():
@@ -195,7 +194,7 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     ---
     **Note:** First generation may take 20-30 seconds as the model loads. Subsequent generations will be faster.
     
-    **Model:** Qwen2.5-7B-Instruct fine-tuned on F1 race strategy data
+    **Model:** Qwen2.5-3B-Instruct fine-tuned on F1 race strategy data
     """)
     
     # Button actions
@@ -222,5 +221,5 @@ with gr.Blocks(theme=gr.themes.Base(), title="F1 Strategy AI") as demo:
     )
 
 # Launch the app
-if __name__ == "__main__":
+if (__name__ == "__main__"):
     demo.launch()
