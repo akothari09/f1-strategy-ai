@@ -39,14 +39,12 @@ def load_model():
     except Exception as e:
         print(f"ERROR loading model: {str(e)}")
         raise e
-
 def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_condition, max_tokens, temperature):
-    """Generate F1 race strategy based on inputs"""
-    
+    # Generate F1 race strategy based on inputs 
     try:
         # Load model if not already loaded
         load_model()
-        
+
         # Create prompt from inputs
         prompt = f"""You are an expert Formula 1 race strategist. Generate an optimal race strategy for the following conditions:
 
@@ -63,28 +61,22 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
         - Key considerations for track conditions
         - Alternate strategies if needed"""
 
-        # Format with chat template
+        # Build chat-formatted prompt using Qwen's template
         messages = [{"role": "user", "content": prompt}]
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
-        # Tokenize
-        inputs = tokenizer(text, return_tensors="pt")
-
-        # Build chat-formatted input
-        messages = [{"role": "user", "content": prompt}]
-        formatted = tokenizer.apply_chat_template(
+        text = tokenizer.apply_chat_template(
             messages,
-            tokenize=True,
-            add_generation_prompt=True,
-            return_tensors="pt"
+            tokenize=False,
+            add_generation_prompt=True
         )
 
-        input_ids = formatted["input_ids"]
+        # Tokenize for the model
+        inputs = tokenizer(text, return_tensors="pt")
+        input_ids = inputs["input_ids"]  # shape: (1, prompt_len)
 
-        # Generate response
+        # Generate
         with torch.no_grad():
             outputs = model.generate(
-                **formatted,
+                **inputs,
                 max_new_tokens=int(max_tokens),
                 do_sample=temperature > 0,
                 temperature=float(temperature) if temperature > 0 else 1.0,
@@ -93,76 +85,42 @@ def generate_strategy(driver, race, track_temp, air_temp, wind_speed, track_cond
                 pad_token_id=tokenizer.eos_token_id,
             )
 
-        # slice off prompt
-        generated_ids = outputs[0][input_ids.shape[-1]:]
+        # Slice off the prompt tokens: keep ONLY the new tokens
+        generated_ids = outputs[0, input_ids.shape[-1]:]
 
-        # decode the rest of the output
+        # Decode only the assistant's reply
         strategy = tokenizer.decode(
             generated_ids,
             skip_special_tokens=True
         ).strip()
 
-        
-        decoded = strategy  # Keep original decoded for fallback
-        
-        # Strategy 1: Look for assistant markers
-        if "assistant" in strategy:
-            strategy = strategy.split("assistant")[-1]
-            strategy = strategy.replace(":", "", 1).strip()
-        
-        # Strategy 2: Remove the exact prompt
-        if prompt in strategy:
-            strategy = strategy.replace(prompt, "")
-        
-        # Strategy 3: Look for common response patterns
-        for marker in ["You are an expert", "Generate an optimal", prompt[:50]]:
-            if marker in strategy:
-                parts = strategy.split(marker)
-                if len(parts) > 1:
-                    strategy = parts[-1]
-        
-        # Strategy 4: If response starts with the question, split on newlines
-        if strategy.strip().startswith(("Driver:", "You are")):
-            lines = strategy.split('\n')
-            for i, line in enumerate(lines):
-                if line.strip() and not any(keyword in line for keyword in 
-                    ["Driver:", "Race:", "Track Temperature:", "Air Temperature:", 
-                     "Wind Speed:", "Track Condition:", "Provide a detailed", 
-                     "You are an expert", "Generate an optimal"]):
-                    strategy = '\n'.join(lines[i:])
-                    break
-        
-        # Clean up
-        strategy = strategy.strip()
-        
-        # If we accidentally removed everything, return original
-        if not strategy or len(strategy) < 50:
-            strategy = decoded
-        
+        # Fallback: if something went wrong and it's empty, decode everything
+        if not strategy:
+            strategy = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+
         # Format the output nicely
         formatted_output = f"""
-        F1 RACE STRATEGY ANALYSIS
+F1 RACE STRATEGY ANALYSIS
 
-        RACE CONDITIONS
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        Driver:              {driver}
-        Circuit:             {race}
-        Track Temperature:   {track_temp}°C
-        Air Temperature:     {air_temp}°C
-        Wind Speed:          {wind_speed} km/h
-        Track Condition:     {track_condition.upper()}
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RACE CONDITIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Driver:              {driver}
+  Circuit:             {race}
+  Track Temperature:   {track_temp}°C
+  Air Temperature:     {air_temp}°C
+  Wind Speed:          {wind_speed} km/h
+  Track Condition:     {track_condition.upper()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        RECOMMENDED STRATEGY
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        {strategy}
+RECOMMENDED STRATEGY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        Generated by F1 Strategy AI | Powered by Qwen2.5-1.5B
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Generated by F1 Strategy AI | Powered by Qwen2.5-1.5B
         """
-        
+
         return formatted_output.strip()
-        
+
     except Exception as e:
         error_msg = f"Error generating strategy: {str(e)}\n\nPlease check the Space logs for details."
         print(f"ERROR in generate_strategy: {str(e)}")
