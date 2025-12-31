@@ -11,6 +11,8 @@ pinned: false
 ```
 
 ---
+
+```
 # F1 Strategy AI
 
 An AI-powered Formula 1 race strategy generator that provides optimal pit stop strategies, tire choices, and race management recommendations based on current track conditions.
@@ -42,17 +44,17 @@ Try the live demo: [F1 Strategy AI on Hugging Face Spaces](https://huggingface.c
 ### Example Usage:
 
 **Input:**
-```
+
 Driver: Max Verstappen
 Race: Monaco Grand Prix
 Track Temperature: 35°C
 Air Temperature: 28°C
 Wind Speed: 15 km/h
 Track Condition: Dry
-```
+
 
 **Output:**
-```
+
 RACE STRATEGY ANALYSIS
 
 STINT 1 (Laps 1-18): MEDIUM COMPOUND
@@ -68,7 +70,7 @@ STINT 2 (Laps 23-50): HARD COMPOUND
 - Push for track position in clean air
 - Monitor tire degradation carefully
 - Adapt strategy for safety car scenarios
-```
+
 
 ## Model Architecture
 
@@ -125,7 +127,7 @@ training_args = TrainingArguments(
     fp16=True,
     warmup_ratio=0.1,
 )
-```
+
 
 ### 3. Training Pipeline
 1. **Data Preprocessing**: Tokenized race strategy examples
@@ -139,20 +141,17 @@ training_args = TrainingArguments(
 ### Run Locally
 
 1. **Clone the repository:**
-```bash
+bash
 git clone https://github.com/akothari09/f1-strategy-ai.git
 cd f1-strategy-ai
-```
 
 2. **Install dependencies:**
-```bash
+bash
 pip install -r requirements.txt
-```
 
 3. **Run the app:**
 ```bash
 python app.py
-```
 
 The application will launch at `http://localhost:7860`
 
@@ -177,13 +176,12 @@ Simply visit: [https://huggingface.co/spaces/akothari09/f1-strategy-ai](https://
 
 ## Project Structure
 
-```
+
 f1-strategy-ai/
 ├── app.py                 # Main Gradio application
 ├── requirements.txt       # Python dependencies
 ├── README.md             # This file
 └── .gitignore            # Git ignore rules
-```
 
 ## Accessing the Model
 
@@ -209,7 +207,6 @@ tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B-Instruct")
 # For fine-tuned version (if you have the adapter)
 from peft import PeftModel
 model = PeftModel.from_pretrained(model, "akothari09/f1StrategyTrainer")
-```
 
 ## License
 
@@ -229,6 +226,6 @@ This project is licensed under the Apache License.
 **GitHub**: [https://github.com/akothari09/f1-strategy-ai]
 
 **HF Space**: [https://huggingface.co/spaces/akothari09/f1-strategy-ai]
+```
 
 **Model**: [https://huggingface.co/akothari09/f1StrategyTrainer]
-
