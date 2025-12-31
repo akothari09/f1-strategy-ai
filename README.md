@@ -127,6 +127,7 @@ training_args = TrainingArguments(
     fp16=True,
     warmup_ratio=0.1,
 )
+```
 
 
 ### 3. Training Pipeline
@@ -141,20 +142,25 @@ training_args = TrainingArguments(
 ### Run Locally
 
 1. **Clone the repository:**
+```
 bash
 git clone https://github.com/akothari09/f1-strategy-ai.git
 cd f1-strategy-ai
+```
 
-2. **Install dependencies:**
+3. **Install dependencies:**
+```
 bash
 pip install -r requirements.txt
+```
 
-3. **Run the app:**
-```bash
+5. **Run the app:**
+```
+bash
 python app.py
 
 The application will launch at `http://localhost:7860`
-
+```
 ### Access via Hugging Face
 
 Simply visit: [https://huggingface.co/spaces/akothari09/f1-strategy-ai](https://huggingface.co/spaces/akothari09/f1-strategy-ai)
@@ -207,6 +213,7 @@ tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B-Instruct")
 # For fine-tuned version (if you have the adapter)
 from peft import PeftModel
 model = PeftModel.from_pretrained(model, "akothari09/f1StrategyTrainer")
+```
 
 ## License
 
@@ -219,6 +226,7 @@ This project is licensed under the Apache License.
 - **Formula 1** for the inspiration
 - **Open-source community** for tools and libraries
 
+```
 ## Contact
 
 **Author**: Aditi Kothari
@@ -226,6 +234,6 @@ This project is licensed under the Apache License.
 **GitHub**: [https://github.com/akothari09/f1-strategy-ai]
 
 **HF Space**: [https://huggingface.co/spaces/akothari09/f1-strategy-ai]
-```
 
 **Model**: [https://huggingface.co/akothari09/f1StrategyTrainer]
+```
