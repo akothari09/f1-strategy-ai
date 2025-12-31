@@ -217,7 +217,7 @@ model = PeftModel.from_pretrained(model, "akothari09/f1StrategyTrainer")
 
 ## License
 
-This project is licensed under the Apache License.
+This project is licensed under the MIT License.
 
 ## Acknowledgments
 
