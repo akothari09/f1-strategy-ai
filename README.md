@@ -226,7 +226,7 @@ This project is licensed under the MIT License.
 - **Formula 1** for the inspiration
 - **Open-source community** for tools and libraries
 
-```
+
 ## Contact
 
 **Author**: Aditi Kothari
